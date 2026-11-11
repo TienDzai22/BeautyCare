@@ -1,0 +1,55 @@
+// Proposed rules for manual deployment. This file is not deployed by the app.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.uid == "bYupM4WnvPQoF7Dv4Xtxvc2INLg1";
+    }
+
+    function hasOnlyProductFields(data) {
+      return data.keys().hasAll(["name", "price", "soluong", "image"])
+        && data.keys().hasOnly(["name", "price", "soluong", "image"]);
+    }
+
+    function isValidProduct(data) {
+      return hasOnlyProductFields(data)
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 160
+        && data.price is number
+        && data.price >= 0
+        && data.soluong is int
+        && data.soluong >= 0
+        && data.image is string
+        && data.image.size() <= 900000;
+    }
+
+    // Kept only to preserve the existing legacy collection if this complete
+    // proposed ruleset is deployed. The application no longer reads users.
+    function hasOnlyLegacyUserFields(data) {
+      return data.keys().hasAll(["email", "matkhau", "hoten", "hinhanh"])
+        && data.keys().hasOnly(["email", "matkhau", "hoten", "hinhanh"]);
+    }
+
+    function isValidLegacyUser(data) {
+      return hasOnlyLegacyUserFields(data)
+        && data.email is string
+        && data.hoten is string
+        && data.matkhau == "Đã ẩn"
+        && data.hinhanh is string
+        && data.hinhanh.size() <= 900000;
+    }
+
+    match /users/{userId} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin() && isValidLegacyUser(request.resource.data);
+    }
+
+    match /products/{productId} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin() && isValidProduct(request.resource.data);
+    }
+  }
+}
